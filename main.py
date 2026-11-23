@@ -71,27 +71,40 @@ def pairwise_winner(a, b):
     first = next((i for i, d in enumerate(diffs) if d != 0), None)
     if first is None:
         return None  # exact tie on every criterion (does not happen here)
+    # A later criterion only overrules the first differing one when it
+    # disagrees by 3+; if several later criteria do, the biggest gap
+    # wins the argument, not whichever happens to come first.
+    override = None
     for j in range(first + 1, len(diffs)):
         if diffs[j] != 0 and abs(diffs[j]) >= 3 and (
             diffs[j] > 0
         ) != (diffs[first] > 0):
-            return a if diffs[j] > 0 else b
+            if override is None or abs(diffs[j]) > abs(diffs[override]):
+                override = j
+    if override is not None:
+        return a if diffs[override] > 0 else b
     return a if diffs[first] > 0 else b
 
 
 def pick_winner(candidates):
     """Round-robin tournament; most pairwise wins takes it."""
-    wins = {c[0]: 0 for c in candidates}
+    wins = {c[0]: 0.0 for c in candidates}
     for i, a in enumerate(candidates):
         for b in candidates[i + 1:]:
             w = pairwise_winner(a, b)
             if w is not None:
                 wins[w[0]] += 1
+            else:
+                # Exact tie on every criterion: split the point so the
+                # game still counts instead of vanishing from the table.
+                wins[a[0]] += 0.5
+                wins[b[0]] += 0.5
     totals = {c[0]: sum(c[2]) for c in candidates}
+    order = {c[0]: i for i, c in enumerate(candidates)}
     # Most wins, then highest total score, then earliest listed.
     ranked = sorted(
         candidates,
-        key=lambda c: (-wins[c[0]], -totals[c[0]], candidates.index(c)),
+        key=lambda c: (-wins[c[0]], -totals[c[0]], order[c[0]]),
     )
     return ranked[0], wins, totals
 
